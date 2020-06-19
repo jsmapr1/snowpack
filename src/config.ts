@@ -135,7 +135,7 @@ export interface SnowpackConfig {
   };
   proxy: Proxy[];
   /** Array of commands to run for each file type */
-  pipeline?: SnowpackPipeline;
+  pipeline: SnowpackPipeline;
 }
 
 export interface CLIFlags extends Omit<Partial<SnowpackConfig['installOptions']>, 'env'> {
@@ -339,7 +339,7 @@ function handleLegacyProxyScripts(config: any) {
 }
 
 type RawScripts = Record<string, string>;
-function normalizeScripts(cwd: string, scripts: RawScripts): BuildScript[] {
+function normalizeScripts(scripts: RawScripts): BuildScript[] {
   const dependenciesLoc =
     process.env.NODE_ENV === 'production' ? BUILD_DEPENDENCIES_DIR : DEV_DEPENDENCIES_DIR;
   const processedScripts: BuildScript[] = [];
@@ -424,17 +424,6 @@ function normalizeScripts(cwd: string, scripts: RawScripts): BuildScript[] {
     });
   }
 
-  const defaultBuildMatch = ['js', 'jsx', 'ts', 'tsx'].filter((ext) => !allBuildMatch.has(ext));
-  if (defaultBuildMatch.length > 0) {
-    const defaultBuildWorkerConfig = {
-      id: `build:${defaultBuildMatch.join(',')}`,
-      type: 'build',
-      match: defaultBuildMatch,
-      cmd: '(default) esbuild',
-      plugin: esbuildPlugin(),
-    } as BuildScript;
-    processedScripts.push(defaultBuildWorkerConfig);
-  }
   processedScripts.sort((a, b) => {
     if (a.type === b.type) {
       if (a.id === 'mount:web_modules') {
@@ -506,16 +495,6 @@ function normalizeConfig(config: SnowpackConfig): SnowpackConfig {
     const configPluginOptions = (Array.isArray(plugin) && plugin[1]) || {};
     const configPluginLoc = require.resolve(configPluginPath, {paths: [cwd]});
     const configPlugin = require(configPluginLoc)(config, configPluginOptions);
-    if (
-      (configPlugin.build ? 1 : 0) +
-        (configPlugin.transform ? 1 : 0) +
-        (configPlugin.bundle ? 1 : 0) >
-      1
-    ) {
-      handleConfigError(
-        `plugin[${configPluginLoc}]: A valid plugin can only have one build(), transform(), or bundle() function.`,
-      );
-    }
     allPlugins[configPluginPath] = configPlugin;
     if (configPlugin.knownEntrypoints) {
       config.knownEntrypoints.push(...configPlugin.knownEntrypoints);
@@ -534,12 +513,12 @@ function normalizeConfig(config: SnowpackConfig): SnowpackConfig {
   }
   config = handleLegacyProxyScripts(config);
   config.proxy = normalizeProxies(config.proxy as any);
-  config.scripts = normalizeScripts(cwd, config.scripts as any);
+  config.scripts = normalizeScripts(config.scripts as any);
   config.scripts.forEach((script: BuildScript, i) => {
     if (script.plugin) return;
 
     // Ensure plugins are properly registered/configured
-    if (['build', 'bundle'].includes(script.type)) {
+    if (['bundle'].includes(script.type)) {
       if (allPlugins[script.cmd]?.[script.type]) {
         script.plugin = allPlugins[script.cmd];
       } else if (allPlugins[script.cmd] && !allPlugins[script.cmd][script.type]) {
@@ -553,6 +532,13 @@ function normalizeConfig(config: SnowpackConfig): SnowpackConfig {
       }
     }
   });
+
+  // build scripts -> pipeline
+  config.scripts
+    .filter(({type}) => type === 'build')
+    .forEach(({id, cmd}) => {
+      config.pipeline[id] = [cmd];
+    });
 
   return config;
 }

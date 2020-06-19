@@ -46,7 +46,7 @@ export default class Pipeline {
     this.isDev = isDev || false;
   }
 
-  /** Load a Snowpack plugin from a string or tuple */
+  /** Load & configure a Snowpack plugin */
   loadPlugin(name: string, options: any = {}): SnowpackPlugin | undefined {
     const config = this.config;
 
@@ -90,6 +90,7 @@ export default class Pipeline {
 
   /** Transform a file through plugins to generate a final result */
   public async transform(input: SnowpackFile): Promise<SnowpackFile> {
+    const config = this.config;
     const cwd = process.cwd();
     const result = {...input}; // result to mutate
 
@@ -146,6 +147,7 @@ export default class Pipeline {
           env: {
             ...npmRunPath.env(),
             FILE: result.filePath,
+            DIST: path.join(cwd, config.devOptions.out),
           },
           input: result.code,
           extendEnv: true,
