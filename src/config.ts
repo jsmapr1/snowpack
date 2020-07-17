@@ -98,6 +98,7 @@ export interface SnowpackConfig {
   webDependencies?: {[packageName: string]: string};
   scripts: Record<string, string>;
   plugins: SnowpackPlugin[];
+  alias: {[key: string]: string};
   devOptions: {
     secure: boolean;
     hostname: string;
@@ -115,7 +116,6 @@ export interface SnowpackConfig {
     installTypes: boolean;
     sourceMap?: boolean | 'inline';
     externalPackage: string[];
-    alias: {[key: string]: string};
     namedExports: string[];
     rollup: {
       plugins: RollupPlugin[]; // for simplicity, only Rollup plugins are supported for now
@@ -149,12 +149,12 @@ export interface CLIFlags extends Omit<Partial<SnowpackConfig['installOptions']>
 const DEFAULT_CONFIG: Partial<SnowpackConfig> = {
   exclude: ['__tests__/**/*', '**/*.@(spec|test).*'],
   plugins: [],
+  alias: {},
   installOptions: {
     dest: 'web_modules',
     externalPackage: [],
     installTypes: false,
     env: {},
-    alias: {},
     namedExports: [],
     rollup: {
       plugins: [],
@@ -195,6 +195,10 @@ const configSchema = {
       type: ['object'],
       additionalProperties: {type: 'string'},
     },
+    alias: {
+      type: 'object',
+      additionalProperties: {type: 'string'},
+    },
     devOptions: {
       type: 'object',
       properties: {
@@ -215,10 +219,6 @@ const configSchema = {
         treeshake: {type: 'boolean'},
         installTypes: {type: 'boolean'},
         sourceMap: {oneOf: [{type: 'boolean'}, {type: 'string'}]},
-        alias: {
-          type: 'object',
-          additionalProperties: {type: 'string'},
-        },
         env: {
           type: 'object',
           additionalProperties: {

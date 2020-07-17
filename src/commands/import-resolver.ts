@@ -69,6 +69,7 @@ export function createImportResolver({
     if (URL_HAS_PROTOCOL_REGEX.test(spec)) {
       return spec;
     }
+    // TODO: if target matches an alias (startsWith), rewrite it
     let mountScript = findMatchingMountScript(config._mountedDirs, spec);
     if (mountScript) {
       const [fromDisk, toUrl] = mountScript;
