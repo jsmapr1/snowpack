@@ -156,7 +156,7 @@ export async function command(commandOptions: CommandOptions) {
       const {baseExt: fileExt} = getExt(locOnDisk);
       let outLoc = locOnDisk.replace(dirDisk, dirDest);
       let builtLocOnDisk = locOnDisk;
-      const extToReplace = srcFileExtensionMapping[fileExt];
+      const extToReplace = config._extensionMap[fileExt] || srcFileExtensionMapping[fileExt];
       if (extToReplace) {
         outLoc = replaceExt(outLoc, extToReplace);
         builtLocOnDisk = replaceExt(builtLocOnDisk, extToReplace);
@@ -169,7 +169,10 @@ export async function command(commandOptions: CommandOptions) {
       });
       allBuiltFromFiles.add(locOnDisk);
       const {baseExt, expandedExt} = getExt(outLoc);
-      let contents = builtFileOutput[srcFileExtensionMapping[fileExt] || fileExt];
+      let contents =
+        builtFileOutput[
+          config._extensionMap[fileExt] || srcFileExtensionMapping[fileExt] || fileExt
+        ];
       if (!contents) {
         continue;
       }

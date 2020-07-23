@@ -44,7 +44,7 @@ import onProcessExit from 'signal-exit';
 import stream from 'stream';
 import url from 'url';
 import zlib from 'zlib';
-import {SnowpackBuildMap} from '../config';
+import {SnowpackBuildMap, SnowpackConfig} from '../config';
 import {EsmHmrEngine} from '../hmr-server-engine';
 import {
   scanCodeImportsExports,
@@ -156,14 +156,18 @@ const sendError = (res, status) => {
   res.end();
 };
 
-function getUrlFromFile(mountedDirectories: [string, string][], fileLoc: string): string | null {
+function getUrlFromFile(
+  mountedDirectories: [string, string][],
+  fileLoc: string,
+  config: SnowpackConfig,
+): string | null {
   for (const [dirDisk, dirUrl] of mountedDirectories) {
     if (fileLoc.startsWith(dirDisk + path.sep)) {
       const {baseExt} = getExt(fileLoc);
       const resolvedDirUrl = dirUrl === '/' ? '' : dirUrl;
       return replaceExt(
         fileLoc.replace(dirDisk, resolvedDirUrl).replace(/[/\\]+/g, '/'),
-        srcFileExtensionMapping[baseExt] || baseExt,
+        config._extensionMap[baseExt] || srcFileExtensionMapping[baseExt] || baseExt,
       );
     }
   }
@@ -827,7 +831,7 @@ export async function command(commandOptions: CommandOptions) {
     if (isLiveReloadPaused) {
       return;
     }
-    let updateUrl = getUrlFromFile(mountedDirectories, fileLoc);
+    let updateUrl = getUrlFromFile(mountedDirectories, fileLoc, config);
     if (!updateUrl) {
       return;
     }

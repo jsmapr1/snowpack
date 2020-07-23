@@ -132,6 +132,7 @@ export interface SnowpackConfig {
   proxy: Proxy[];
   // experimental API; to convert to supported config values in the future
   _mountedDirs: Record<string, string>;
+  _extensionMap: Record<string, string>;
   _bundler: SnowpackPlugin | undefined;
   _webModulesPath: string;
 }
@@ -331,6 +332,7 @@ function loadPlugins(
   bundler: SnowpackPlugin | undefined;
   mountedDirs: Record<string, string>;
   webModulesDir: string;
+  extensionMap: Record<string, string>;
 } {
   const plugins: SnowpackPlugin[] = [];
   const mountedDirs: Record<string, string> = {};
@@ -459,11 +461,19 @@ function loadPlugins(
     plugins.unshift(esbuildPlugin({input: [...needsDefaultPlugin]}));
   }
 
+  const extensionMap = plugins.reduce((map, {input, output}) => {
+    for (const inputExt of input) {
+      map[inputExt] = output[0];
+    }
+    return map;
+  }, {} as Record<string, string>);
+
   return {
     plugins,
     bundler,
     mountedDirs,
     webModulesDir, // TODO: remove this when mount:web_modules no longer supported
+    extensionMap,
   };
 }
 
@@ -559,11 +569,12 @@ function normalizeConfig(config: SnowpackConfig): SnowpackConfig {
   config.proxy = normalizeProxies(config.proxy as any);
 
   // new pipeline
-  const {plugins, mountedDirs, bundler, webModulesDir} = loadPlugins(config);
+  const {plugins, mountedDirs, bundler, webModulesDir, extensionMap} = loadPlugins(config);
   config.plugins = plugins;
   config._mountedDirs = mountedDirs;
   config._bundler = bundler;
   config._webModulesPath = webModulesDir;
+  config._extensionMap = extensionMap;
 
   // If any plugins defined knownEntrypoints, add them here
   for (const {knownEntrypoints} of config.plugins) {
