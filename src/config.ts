@@ -1,5 +1,6 @@
 import {cosmiconfigSync} from 'cosmiconfig';
 import {all as merge} from 'deepmerge';
+import fs from 'fs';
 import http from 'http';
 import type HttpProxy from 'http-proxy';
 import {validate, ValidatorResult} from 'jsonschema';
@@ -39,14 +40,19 @@ export interface SnowpackSourceFile {
   locOnDisk: string;
 }
 
-export interface BuildOptions {
-  contents: string;
+export interface LoadOptions {
   filePath: string;
   fileExt: string;
   isDev: boolean;
   log: (msg, data) => void;
-  /** DEPRECATED */
-  urlPath: string;
+}
+
+export interface TransformOptions {
+  filePath: string;
+  fileExt: string;
+  contents: string;
+  isDev: boolean;
+  log: (msg, data) => void;
 }
 
 export interface RunOptions {
@@ -58,7 +64,7 @@ export interface RunOptions {
 export type __OldBuildResult = {result: string; resources?: {css?: string}};
 
 /** map of extensions -> code (e.g. { ".js": "[code]", ".css": "[code]" }) */
-export type BuildResult = string | {[fileExtension: string]: string} | __OldBuildResult;
+export type LoadResult = string | {[fileExtension: string]: string};
 
 export interface BundleOptions {
   srcDirectory: string;
@@ -70,12 +76,16 @@ export interface BundleOptions {
 export interface SnowpackPlugin {
   /** name of the plugin */
   name: string;
-  /** file extensions this plugin takes as input (e.g. [".jsx", ".js", …]) */
-  input: string[];
-  /** file extensions this plugin output (e.g. [".js", ".css"]) */
-  output: string[];
-  /** transform input to output */
-  build?(options: BuildOptions): Promise<BuildResult | null>;
+  resolve?: {
+    /** file extensions that this load function takes as input (e.g. [".jsx", ".js", …]) */
+    input: string[];
+    /** file extensions that this load function outputs (e.g. [".js", ".css"]) */
+    output: string[];
+  };
+  /** load a file that matches resolve.input */
+  load?(options: LoadOptions): Promise<LoadResult | null>;
+  /** transform a file that matches resolve.input */
+  transform?(options: TransformOptions): Promise<string | {result: string} | null>;
   /** runs a command, unrelated to file building (e.g. TypeScript, ESLint) */
   run?(options: RunOptions): Promise<unknown>;
   /** bundle the entire built application */
@@ -352,21 +362,17 @@ function loadPlugins(
     const pluginLoc = require.resolve(name, {paths: [process.cwd()]});
     const plugin = require(pluginLoc)(config, options);
     plugin.name = plugin.name || name;
-    if (plugin.defaultBuildScript && !plugin.input) {
-      const {input, output} = parseScript(plugin.defaultBuildScript);
-      plugin.input = input;
-      plugin.output = output;
+    if (plugin.build) {
+      plugin.load = (options: LoadOptions) =>
+        plugin.build({...options, contents: fs.readFileSync(options.filePath, 'utf-8')});
     }
-    plugin.input = plugin.input
-      ? Array.isArray(plugin.input)
-        ? plugin.input
-        : [plugin.input]
-      : [];
-    plugin.output = plugin.output
-      ? Array.isArray(plugin.output)
-        ? plugin.output
-        : [plugin.output]
-      : plugin.input; // if no plugin.output, use input
+    if (plugin.defaultBuildScript && !plugin.resolve) {
+      const {input, output} = parseScript(plugin.defaultBuildScript);
+      plugin.resolve = {input, output};
+    } else if (plugin.resolve) {
+      const {input, output} = plugin.resolve;
+      plugin.resolve = {input, output};
+    }
     return plugin;
   }
 
@@ -455,15 +461,18 @@ function loadPlugins(
 
   const needsDefaultPlugin = new Set(['.mjs', '.jsx', '.ts', '.tsx']);
   plugins
-    .reduce((arr, a) => arr.concat(a.input), [] as string[])
+    .filter(({resolve}) => !!resolve)
+    .reduce((arr, a) => arr.concat(a.resolve!.input), [] as string[])
     .forEach((ext) => needsDefaultPlugin.delete(ext));
   if (needsDefaultPlugin.size > 0) {
     plugins.unshift(esbuildPlugin({input: [...needsDefaultPlugin]}));
   }
 
-  const extensionMap = plugins.reduce((map, {input, output}) => {
-    for (const inputExt of input) {
-      map[inputExt] = output[0];
+  const extensionMap = plugins.reduce((map, {resolve}) => {
+    if (resolve) {
+      for (const inputExt of resolve.input) {
+        map[inputExt] = resolve.output[0];
+      }
     }
     return map;
   }, {} as Record<string, string>);

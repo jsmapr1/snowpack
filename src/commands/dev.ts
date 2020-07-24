@@ -499,13 +499,13 @@ export async function command(commandOptions: CommandOptions) {
      * pipeline, and outputs a build map representing the final build. A Build Map is used
      * because one source file can result in multiple built files (Example: .svelte -> .js & .css).
      */
-    async function buildFile(fileLoc: string, fileContents: string): Promise<SnowpackBuildMap> {
+    async function buildFile(fileLoc: string): Promise<SnowpackBuildMap> {
       const existingBuilderPromise = filesBeingBuilt.get(fileLoc);
       if (existingBuilderPromise) {
         return existingBuilderPromise;
       }
       const fileBuilderPromise = (async () => {
-        const builtFileOutput = await _buildFile(fileLoc, fileContents, {
+        const builtFileOutput = await _buildFile(fileLoc, {
           buildPipeline: config.plugins,
           messageBus,
           isDev: true,
@@ -713,7 +713,7 @@ export async function command(commandOptions: CommandOptions) {
         // ...but verify.
         let checkFinalBuildResult: SnowpackBuildMap | null = null;
         try {
-          checkFinalBuildResult = await buildFile(fileLoc, fileContents);
+          checkFinalBuildResult = await buildFile(fileLoc);
         } catch (err) {
           // safe to ignore, it will be surfaced later anyway
         } finally {
@@ -734,7 +734,7 @@ export async function command(commandOptions: CommandOptions) {
     let responseContent: string | null;
     let responseOutput: SnowpackBuildMap;
     try {
-      responseOutput = await buildFile(fileLoc, fileContents);
+      responseOutput = await buildFile(fileLoc);
     } catch (err) {
       sendError(res, 500);
       return;

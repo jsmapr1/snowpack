@@ -161,8 +161,7 @@ export async function command(commandOptions: CommandOptions) {
         outLoc = replaceExt(outLoc, extToReplace);
         builtLocOnDisk = replaceExt(builtLocOnDisk, extToReplace);
       }
-      const fileContents = await fs.readFile(locOnDisk, getEncodingType(extToReplace || fileExt));
-      const builtFileOutput = await buildFile(locOnDisk, fileContents, {
+      const builtFileOutput = await buildFile(locOnDisk, {
         buildPipeline: config.plugins,
         messageBus,
         isDev: false,
