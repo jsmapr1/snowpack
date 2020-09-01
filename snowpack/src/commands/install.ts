@@ -359,6 +359,10 @@ ${colors.dim(
       polyfillNode && rollupPluginNodePolyfills(),
       ...userDefinedRollup.plugins, // load user-defined plugins last
       rollupPluginCatchUnresolved(),
+      {
+        name: 'strip-source-mapping',
+        transform: code => code.replace(/\/\/+#\s*sourceMappingURL=.+$/gm, '')
+      },
     ].filter(Boolean) as Plugin[],
     onwarn(warning, warn) {
       // Warn about the first circular dependency, but then ignore the rest.
